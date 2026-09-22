@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Git
+.git/
+.gitignore
+
+# Colab
+*.csv
+*.zip
+
+# Raw / intermediate large datasets
+data/sales_train_evaluation.csv
+data/sales_train_validation.csv
+data/sell_prices.csv
+data/sales_calendar_price_train.parquet
+data/preprocessed_train.parquet
+data/features_time.parquet
+data/features_lag.parquet
+data/features_rolling.parquet
+data/features_price.parquet
+data/features_event_snap.parquet
+
+# Training / temporary artifacts
+logs/
+tmp/
+.cache/
+
+# OS
+.DS_Store
+Thumbs.db
+data/features_production.parquet
+data/features_production_clean.parquet
