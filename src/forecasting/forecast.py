@@ -1,8 +1,11 @@
 import pickle
+import threading
+
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
-import tensorflow as tf
+
+from ai_edge_litert.interpreter import Interpreter
 
 
 class ForecastEngine:
@@ -40,12 +43,25 @@ class ForecastEngine:
                 "Scaler feature count does not match feature columns"
             )
 
-        # Load model only once
-        self.model = tf.keras.models.load_model(
-            self.model_path
+        # Load LiteRT model only once
+        self.interpreter = Interpreter(
+            model_path=self.model_path
         )
 
-        # Open optimized history file only once
+        self.interpreter.allocate_tensors()
+
+        self.input_details = (
+            self.interpreter.get_input_details()
+        )
+
+        self.output_details = (
+            self.interpreter.get_output_details()
+        )
+
+        # Protect the interpreter during concurrent requests
+        self.inference_lock = threading.Lock()
+
+        # Open history file only once
         if self.history_path is None:
             raise ValueError(
                 "history_path is required for production inference"
@@ -63,36 +79,24 @@ class ForecastEngine:
             "date"
         ] + self.feature_columns
 
-        series_parts = []
+        # Read only the requested item-store data
+        table = pq.read_table(
+            self.history_path,
+            columns=required_columns,
+            filters=[
+                ("item_id", "==", item_id),
+                ("store_id", "==", store_id),
+            ],
+        )
 
-        for row_group in range(
-            self.history_file.num_row_groups
-        ):
-
-            df = self.history_file.read_row_group(
-                row_group,
-                columns=required_columns
-            ).to_pandas()
-
-            df = df[
-                (df["item_id"] == item_id) &
-                (df["store_id"] == store_id)
-            ]
-
-            if len(df) > 0:
-                series_parts.append(df)
-
-            del df
-
-        if not series_parts:
+        if table.num_rows == 0:
             raise ValueError(
                 f"Series not found: {item_id} / {store_id}"
             )
 
-        series_df = pd.concat(
-            series_parts,
-            ignore_index=True
-        )
+        series_df = table.to_pandas()
+
+        del table
 
         series_df["date"] = pd.to_datetime(
             series_df["date"]
@@ -145,7 +149,7 @@ class ForecastEngine:
                 "Inf values found in inference features"
             )
 
-        # Scale using already loaded scaler
+        # Scale using the already loaded scaler
         X_scaled = self.scaler.transform(
             X_raw
         ).astype(np.float32)
@@ -156,11 +160,19 @@ class ForecastEngine:
             len(self.feature_columns)
         )
 
-        # Predict using already loaded model
-        prediction = self.model(
-            tf.convert_to_tensor(X_scaled),
-            training=False
-        ).numpy()
+        # Predict using LiteRT
+        with self.inference_lock:
+
+            self.interpreter.set_tensor(
+                self.input_details[0]["index"],
+                X_scaled
+            )
+
+            self.interpreter.invoke()
+
+            prediction = self.interpreter.get_tensor(
+                self.output_details[0]["index"]
+            )
 
         prediction = float(
             prediction[0, 0]
