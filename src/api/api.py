@@ -47,7 +47,7 @@ DATA_PATH = os.path.join(
 MODEL_PATH = os.path.join(
     PROJECT_ROOT,
     "models",
-    "lstm_attention_production.keras"
+    "lstm_attention_unrolled.tflite"
 )
 
 SCALER_PATH = os.path.join(
