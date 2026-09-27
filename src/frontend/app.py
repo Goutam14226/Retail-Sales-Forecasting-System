@@ -80,10 +80,14 @@ if st.button("Forecast"):
                 )
 
             else:
+                st.error(f"API Error: {response.status_code}")
 
-                st.error(
-                    f"API Error: {response.status_code}"
-                )
+                st.write("API URL:", API_URL)
+                st.write("Response headers:")
+                st.json(dict(response.headers))
+
+                st.write("Response body:")
+                st.code(response.text)
 
         except requests.exceptions.RequestException as e:
 
