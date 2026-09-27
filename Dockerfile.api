@@ -7,7 +7,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
-COPY models ./models
+
+COPY models/lstm_attention_unrolled.tflite ./models/lstm_attention_unrolled.tflite
+COPY models/feature_scaler.pkl ./models/feature_scaler.pkl
+
 COPY data/latest_history.parquet ./data/latest_history.parquet
 COPY configs ./configs
 
